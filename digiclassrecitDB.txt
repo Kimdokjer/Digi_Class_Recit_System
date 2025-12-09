@@ -1,0 +1,281 @@
+-- Create the database
+
+CREATE DATABASE IF NOT EXISTS digiclass;
+
+USE digiclass;
+
+
+
+-- ==========================================
+
+-- 1. REFERENCE TABLES (Lookups)
+
+-- ==========================================
+
+
+
+-- Table: course
+
+-- Normalization: Stores unique courses to avoid repeating course names in the students table.
+
+CREATE TABLE IF NOT EXISTS course (
+
+    course_id INT AUTO_INCREMENT PRIMARY KEY,
+
+    course_name VARCHAR(100) NOT NULL UNIQUE
+
+);
+
+
+
+-- Table: subjects
+
+-- Normalization: Stores unique subjects. 'subject_code' is the natural primary key here.
+
+CREATE TABLE IF NOT EXISTS subjects (
+
+    subject_code VARCHAR(50) PRIMARY KEY,
+
+    subject_name VARCHAR(255) NOT NULL
+
+);
+
+
+
+-- ==========================================
+
+-- 2. MAIN ENTITY TABLES
+
+-- ==========================================
+
+
+
+-- Table: students
+
+-- Normalization: 
+
+--  - Uses 'course_id' (FK) instead of a text field for course name.
+
+--  - 'student_id' is the primary key identifying a student.
+
+CREATE TABLE IF NOT EXISTS students (
+
+    student_id VARCHAR(50) PRIMARY KEY,
+
+    course_id INT,
+
+    email VARCHAR(150) NOT NULL UNIQUE,
+
+    lastname VARCHAR(100) NOT NULL,
+
+    firstname VARCHAR(100) NOT NULL,
+
+    middlename VARCHAR(100),
+
+    gender ENUM('Male', 'Female', 'Other') DEFAULT 'Other',
+
+    birthdate DATE NOT NULL,
+
+    date_added DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_student_course FOREIGN KEY (course_id) 
+
+        REFERENCES course(course_id) ON DELETE SET NULL ON UPDATE CASCADE
+
+);
+
+
+
+-- Table: class_sections
+
+-- Normalization: 
+
+--  - Represents a specific offering of a subject (e.g., "BSCS-3A" taking "WD123").
+
+--  - Links to 'subjects' via Foreign Key.
+
+CREATE TABLE IF NOT EXISTS class_sections (
+
+    class_id INT AUTO_INCREMENT PRIMARY KEY,
+
+    class_name VARCHAR(100) NOT NULL,
+
+    subject_code VARCHAR(50) NOT NULL,
+
+    CONSTRAINT fk_class_subject FOREIGN KEY (subject_code) 
+
+        REFERENCES subjects(subject_code) ON DELETE CASCADE ON UPDATE CASCADE
+
+);
+
+
+
+-- Table: users
+
+-- Normalization: 
+
+--  - Separates authentication (login) data from student profile data.
+
+--  - Links back to 'students' for authorization.
+
+CREATE TABLE IF NOT EXISTS users (
+
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+
+    username VARCHAR(100) NOT NULL UNIQUE,
+
+    password_hash VARCHAR(255) NOT NULL,
+
+    role ENUM('admin', 'student') NOT NULL DEFAULT 'student',
+
+    student_id VARCHAR(50) NULL,
+
+    is_verified TINYINT(1) DEFAULT 0,
+
+    CONSTRAINT fk_user_student FOREIGN KEY (student_id) 
+
+        REFERENCES students(student_id) ON DELETE CASCADE ON UPDATE CASCADE
+
+);
+
+
+
+-- ==========================================
+
+-- 3. TRANSACTIONAL & LINKING TABLES
+
+-- ==========================================
+
+
+
+-- Table: student_enrollments
+
+-- Normalization: 
+
+--  - A "Junction Table" that resolves the Many-to-Many relationship between Students and Classes.
+
+--  - Prevents storing multiple class IDs in a single cell in the students table.
+
+CREATE TABLE IF NOT EXISTS student_enrollments (
+
+    enrollment_id INT AUTO_INCREMENT PRIMARY KEY,
+
+    student_id VARCHAR(50) NOT NULL,
+
+    class_id INT NOT NULL,
+
+    enrolled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_enroll_student FOREIGN KEY (student_id) 
+
+        REFERENCES students(student_id) ON DELETE CASCADE ON UPDATE CASCADE,
+
+    CONSTRAINT fk_enroll_class FOREIGN KEY (class_id) 
+
+        REFERENCES class_sections(class_id) ON DELETE CASCADE ON UPDATE CASCADE,
+
+    -- Ensure a student cannot be enrolled in the same class section twice
+
+    UNIQUE KEY unique_enrollment (student_id, class_id)
+
+);
+
+
+
+-- Table: recits (Recitations)
+
+-- Normalization: 
+
+--  - Records transactional data (scores).
+
+--  - Links to specific student and subject.
+
+CREATE TABLE IF NOT EXISTS recits (
+
+    recit_id INT AUTO_INCREMENT PRIMARY KEY,
+
+    student_id VARCHAR(50) NOT NULL,
+
+    subject_code VARCHAR(50) NOT NULL,
+
+    date DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    score DECIMAL(5, 2) NOT NULL,
+
+    mode VARCHAR(50) DEFAULT 'Normal',
+
+    CONSTRAINT fk_recit_student FOREIGN KEY (student_id) 
+
+        REFERENCES students(student_id) ON DELETE CASCADE ON UPDATE CASCADE,
+
+    CONSTRAINT fk_recit_subject FOREIGN KEY (subject_code) 
+
+        REFERENCES subjects(subject_code) ON DELETE CASCADE ON UPDATE CASCADE
+
+);
+
+
+
+-- Table: notifications
+
+-- Normalization: Stores alerts separately from user data.
+
+CREATE TABLE IF NOT EXISTS notifications (
+
+    notification_id INT AUTO_INCREMENT PRIMARY KEY,
+
+    student_id VARCHAR(50) NOT NULL,
+
+    message TEXT NOT NULL,
+
+    link VARCHAR(255),
+
+    is_read TINYINT(1) DEFAULT 0,
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_notif_student FOREIGN KEY (student_id) 
+
+        REFERENCES students(student_id) ON DELETE CASCADE ON UPDATE CASCADE
+
+);
+
+
+
+-- Table: user_verification
+
+-- Normalization: Temporary transactional table for email tokens.
+
+CREATE TABLE IF NOT EXISTS user_verification (
+
+    id INT AUTO_INCREMENT PRIMARY KEY,
+
+    token VARCHAR(255) NOT NULL,
+
+    student_id VARCHAR(50) NOT NULL,
+
+    expires_at DATETIME NOT NULL,
+
+    CONSTRAINT fk_verify_student FOREIGN KEY (student_id) 
+
+        REFERENCES students(student_id) ON DELETE CASCADE ON UPDATE CASCADE
+
+);
+
+
+
+-- ==========================================
+
+-- 4. DEFAULT DATA (Optional)
+
+-- ==========================================
+
+
+
+-- Insert a default Admin (Password: adminpass)
+
+-- Note: In a real scenario, change the hash to your preferred password.
+
+INSERT INTO users (username, password_hash, role, is_verified) 
+
+VALUES ('admin', '$2y$10$m0T7yxAhMjx63TNMiDDN0u44T02wT5i5YZRnBkgpvciIix5Nuy2oy', 'admin', 1);;
