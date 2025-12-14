@@ -72,7 +72,9 @@ CREATE TABLE IF NOT EXISTS students (
 
     middlename VARCHAR(100),
 
-    gender ENUM('Male', 'Female', 'Other') DEFAULT 'Other',
+    nickname VARCHAR(100),
+
+    gender VARCHAR(50),
 
     birthdate DATE NOT NULL,
 
@@ -277,5 +279,6 @@ CREATE TABLE IF NOT EXISTS user_verification (
 -- Note: In a real scenario, change the hash to your preferred password.
 
 INSERT INTO users (username, password_hash, role, is_verified) 
+
 
 VALUES ('admin', '$2y$10$m0T7yxAhMjx63TNMiDDN0u44T02wT5i5YZRnBkgpvciIix5Nuy2oy', 'admin', 1);;
